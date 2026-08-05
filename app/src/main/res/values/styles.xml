@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.ProxyYab" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="colorPrimary">#146C5B</item>
+        <item name="colorSecondary">#5E6E67</item>
+        <item name="android:navigationBarColor">#F5F7F5</item>
+    </style>
+</resources>
