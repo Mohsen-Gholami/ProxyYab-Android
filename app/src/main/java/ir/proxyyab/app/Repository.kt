@@ -35,8 +35,10 @@ class Repository(private val context: Context) {
                 }
             }.awaitAll().flatten()
         }.distinctBy { it.uri }
-        val gate = Semaphore(32)
-        val checked = coroutineScope { all.take(500).map { async { gate.withPermit { check(it) } } }.awaitAll() }
+        // Keep at most 30 recent entries in each UI family before opening sockets.
+        val limited = all.groupBy { family(it.kind) }.values.flatMap { it.take(30) }
+        val gate = Semaphore(12)
+        val checked = coroutineScope { limited.map { async { gate.withPermit { check(it) } } }.awaitAll() }
             .sortedWith(compareByDescending<Candidate> { it.reachable }.thenBy { it.latencyMs ?: Long.MAX_VALUE })
         saveCache(checked)
         checked
@@ -56,10 +58,21 @@ class Repository(private val context: Context) {
     }
 
     private fun check(c: Candidate): Candidate {
-        if (c.kind == Kind.NPVT) return c.copy(reachable = true, checkedAt = System.currentTimeMillis())
+        if (c.kind in setOf(Kind.NPVT, Kind.OPENVPN, Kind.WIREGUARD, Kind.SLIPNET, Kind.OTHER))
+            return c.copy(reachable = true, checkedAt = System.currentTimeMillis())
         val start = System.nanoTime()
         val ok = try { Socket().use { it.connect(InetSocketAddress(c.host, c.port!!), 3500); true } } catch (_: Exception) { false }
         return c.copy(reachable = ok, latencyMs = if (ok) (System.nanoTime() - start) / 1_000_000 else null, checkedAt = System.currentTimeMillis())
+    }
+
+    private fun family(kind: Kind): String = when (kind) {
+        Kind.TELEGRAM -> "telegram"
+        Kind.VMESS, Kind.VLESS, Kind.TROJAN, Kind.SHADOWSOCKS -> "v2ray"
+        Kind.NPVT -> "npvt"
+        Kind.OPENVPN -> "openvpn"
+        Kind.WIREGUARD -> "wireguard"
+        Kind.SLIPNET -> "slipnet"
+        else -> "other"
     }
 
     private fun saveCache(items: List<Candidate>) {
