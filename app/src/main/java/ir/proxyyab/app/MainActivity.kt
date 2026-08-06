@@ -98,8 +98,9 @@ class MainActivity : AppCompatActivity() {
     private fun resultRow(number: Int, item: Candidate): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(11), dp(14), dp(11)); background = rounded(Color.rgb(247, 250, 249), 15f); layoutParams = marginParams(4)
         val kindName = when (item.kind) { Kind.TELEGRAM -> "Telegram"; Kind.NPVT -> "NPVT"; Kind.OPENVPN -> "OVPN"; Kind.WIREGUARD -> "WireGuard"; Kind.SLIPNET -> "SlipNet"; else -> item.kind.name }
+        val detail = if (item.host != null) "${item.host}:${item.port}  •  ${item.latencyMs ?: 0} ms" else "برای بازکردن یا ایمپورت لمس کنید"
         addView(TextView(this@MainActivity).apply { text = "$number.  ● سالم  •  $kindName"; textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(Color.rgb(17, 113, 82)); gravity = Gravity.RIGHT })
-        addView(TextView(this@MainActivity).apply { text = item.host?.let { "$it:${item.port}  •  ${item.latencyMs ?: "—"} ms" } ?: "برای بازکردن یا ایمپورت لمس کنید"; textSize = 12f; gravity = Gravity.RIGHT; setTextColor(Color.DKGRAY })
+        addView(TextView(this@MainActivity).apply { text = detail; textSize = 12f; gravity = Gravity.RIGHT; setTextColor(Color.DKGRAY) })
         setOnClickListener { open(item) }
     }
 
