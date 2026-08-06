@@ -19,5 +19,5 @@ class ProxyAdapter(private val open: (Candidate) -> Unit) : RecyclerView.Adapter
         return H(root,t,d)
     }
     override fun getItemCount()=data.size
-    override fun onBindViewHolder(h:H,i:Int) { val x=data[i]; h.title.text="${if(x.reachable) "● سالم" else "○ ناموفق"}  •  ${x.kind}"; h.detail.text="${x.host}:${x.port}  |  ${x.latencyMs?.let{"$it ms"}?:"بدون پاسخ"}"; h.root.setOnClickListener { open(x) } }
+    override fun onBindViewHolder(h:H,i:Int) { val x=data[i]; h.title.text=if(x.kind==Kind.NPVT) "فایل NPVT • بازکردن در تلگرام" else "${if(x.reachable) "● سالم" else "○ ناموفق"}  •  ${x.kind}"; h.detail.text=if(x.kind==Kind.NPVT) "منبع: ${x.source.substringAfterLast('/')}" else "${x.host}:${x.port}  |  ${x.latencyMs?.let{"$it ms"}?:"بدون پاسخ"}"; h.root.setOnClickListener { open(x) } }
 }
