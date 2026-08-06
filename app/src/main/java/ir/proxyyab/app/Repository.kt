@@ -25,7 +25,12 @@ class Repository(private val context: Context) {
 
     suspend fun refresh(): List<Candidate> = withContext(Dispatchers.IO) {
         val all = coroutineScope {
-            sources().map { url -> async { fetch(url)?.let { Parser.extract(it, url) }.orEmpty() } }.awaitAll().flatten()
+            sources().map { original ->
+                async {
+                    val url = normalizeSourceUrl(original)
+                    fetch(url)?.let { Parser.extract(it, original) }.orEmpty()
+                }
+            }.awaitAll().flatten()
         }.distinctBy { it.uri }
         val gate = Semaphore(32)
         val checked = coroutineScope { all.take(500).map { async { gate.withPermit { check(it) } } }.awaitAll() }
@@ -39,6 +44,13 @@ class Repository(private val context: Context) {
             if (it.isSuccessful) it.body?.string() else null
         }
     } catch (_: Exception) { null }
+
+    /** Telegram's normal channel URL is only a landing page. /s/ exposes public post previews. */
+    private fun normalizeSourceUrl(input: String): String {
+        val clean = input.trim().removeSuffix("/")
+        val match = Regex("(?i)^https?://(?:www\\.)?t\\.me/([A-Za-z0-9_]{4,})$").matchEntire(clean)
+        return match?.groupValues?.get(1)?.let { "https://t.me/s/$it" } ?: clean
+    }
 
     private fun check(c: Candidate): Candidate {
         val start = System.nanoTime()
