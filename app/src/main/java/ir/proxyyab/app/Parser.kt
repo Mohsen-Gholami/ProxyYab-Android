@@ -6,7 +6,7 @@ import org.json.JSONObject
 import java.net.URI
 
 object Parser {
-    private val schemeRegex = Regex("(?i)(?:https?://t\\.me/(?:proxy|socks)\\?[^\\s<>\"']+|tg://(?:proxy|socks)\\?[^\\s<>\"']+|(?:vmess|vless|trojan|ss|wireguard|wg|hysteria2?|hy2|tuic)://[^\\s<>\"']+)")
+    private val schemeRegex = Regex("(?i)(?:https?://(?:t\\.me|telegram\\.me)/(?:proxy|socks)\\?[^\\s<>\"']+|tg:(?://)?(?:proxy|socks)\\?[^\\s<>\"']+|(?:vmess|vless|trojan|ss|wireguard|wg|hysteria2?|hy2|tuic)://[^\\s<>\"']+)")
     private val documentRegex = Regex("""<a\b(?=[^>]*document_wrap)(?=[^>]*href="([^"]+)")[^>]*>.*?</a>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val fileRegex = Regex("""(?i)https?://[^\s<>"']+\.(?:npvt|ovpn|conf|slip|snet)(?:\?[^\s<>"']*)?""")
 
@@ -44,7 +44,7 @@ object Parser {
 
     fun parse(raw: String, source: String): Candidate? = try {
         when {
-            raw.startsWith("tg://", true) || raw.startsWith("http://t.me/proxy", true) || raw.startsWith("https://t.me/proxy", true) || raw.startsWith("http://t.me/socks", true) || raw.startsWith("https://t.me/socks", true) -> {
+            raw.startsWith("tg:", true) || raw.contains("t.me/proxy", true) || raw.contains("t.me/socks", true) || raw.contains("telegram.me/proxy", true) || raw.contains("telegram.me/socks", true) -> {
                 val u = Uri.parse(raw)
                 val host = u.getQueryParameter("server")
                 val port = u.getQueryParameter("port")?.toIntOrNull()
