@@ -7,13 +7,19 @@ import java.net.URI
 
 object Parser {
     private val schemeRegex = Regex("(?i)(?:https?://t\\.me/(?:proxy|socks)\\?[^\\s<>\"']+|tg://(?:proxy|socks)\\?[^\\s<>\"']+|(?:vmess|vless|trojan|ss)://[^\\s<>\"']+)")
+    private val documentRegex = Regex("""<a\b(?=[^>]*document_wrap)(?=[^>]*href="([^"]+)")[^>]*>.*?</a>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
 
     fun extract(text: String, source: String): List<Candidate> {
         val expanded = maybeSubscription(text)
-        return schemeRegex.findAll(text + "\n" + expanded)
+        val configs = schemeRegex.findAll(text + "\n" + expanded)
             .mapNotNull { parse(it.value.replace("&amp;", "&"), source) }
-            .distinctBy { it.uri }
             .toList()
+        val files = documentRegex.findAll(text)
+            .filter { it.value.contains(".npvt", ignoreCase = true) }
+            .map { it.groupValues[1].replace("&amp;", "&") }
+            .map { Candidate(it, Kind.NPVT, null, null, source, reachable = true) }
+            .toList()
+        return (configs + files).distinctBy { it.uri }
     }
 
     private fun maybeSubscription(input: String): String = try {
