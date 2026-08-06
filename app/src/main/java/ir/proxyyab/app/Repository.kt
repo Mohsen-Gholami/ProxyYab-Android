@@ -35,13 +35,19 @@ class Repository(private val context: Context) {
                 }
             }.awaitAll().flatten()
         }.distinctBy { it.uri }
-        // Keep at most 30 recent entries in each UI family before opening sockets.
-        val limited = all.groupBy { family(it.kind) }.values.flatMap { it.take(30) }
+        // Probe beyond the first 30 because public lists often start with expired nodes.
+        // File-based families need no socket test, so 30 entries are sufficient there.
+        val limited = all.groupBy { family(it.kind) }.values.flatMap { group ->
+            if (group.firstOrNull()?.host == null) group.take(30) else group.take(90)
+        }
         val gate = Semaphore(12)
         val checked = coroutineScope { limited.map { async { gate.withPermit { check(it) } } }.awaitAll() }
             .sortedWith(compareByDescending<Candidate> { it.reachable }.thenBy { it.latencyMs ?: Long.MAX_VALUE })
-        saveCache(checked)
-        checked
+        val healthy = checked.filter { it.reachable }.groupBy { family(it.kind) }.values.flatMap { it.take(30) }
+        if (healthy.isNotEmpty()) {
+            saveCache(healthy)
+            healthy
+        } else cached()
     }
 
     private fun fetch(url: String): String? = try {
@@ -61,7 +67,7 @@ class Repository(private val context: Context) {
         if (c.kind in setOf(Kind.NPVT, Kind.OPENVPN, Kind.WIREGUARD, Kind.SLIPNET, Kind.OTHER))
             return c.copy(reachable = true, checkedAt = System.currentTimeMillis())
         val start = System.nanoTime()
-        val ok = try { Socket().use { it.connect(InetSocketAddress(c.host, c.port!!), 3500); true } } catch (_: Exception) { false }
+        val ok = try { Socket().use { it.connect(InetSocketAddress(c.host, c.port!!), 2200); true } } catch (_: Exception) { false }
         return c.copy(reachable = ok, latencyMs = if (ok) (System.nanoTime() - start) / 1_000_000 else null, checkedAt = System.currentTimeMillis())
     }
 
