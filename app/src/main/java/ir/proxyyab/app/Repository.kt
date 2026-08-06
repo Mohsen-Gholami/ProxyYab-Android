@@ -20,7 +20,10 @@ class Repository(private val context: Context) {
     private val prefs = context.getSharedPreferences("proxy_yab", Context.MODE_PRIVATE)
     private val client = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(12, TimeUnit.SECONDS).followRedirects(true).build()
 
-    fun sources(): List<String> = prefs.getString("sources", "")!!.lines().map { it.trim() }.filter { it.startsWith("http") }
+    fun sources(): List<String> {
+        val custom = prefs.getString("sources", "")!!.lines().map { it.trim() }.filter { it.startsWith("http") }
+        return (DefaultSources.urls + custom).distinct()
+    }
     fun saveSources(value: String) = prefs.edit().putString("sources", value).apply()
 
     suspend fun refresh(): List<Candidate> = withContext(Dispatchers.IO) {
@@ -53,6 +56,7 @@ class Repository(private val context: Context) {
     }
 
     private fun check(c: Candidate): Candidate {
+        if (c.kind == Kind.NPVT) return c.copy(reachable = true, checkedAt = System.currentTimeMillis())
         val start = System.nanoTime()
         val ok = try { Socket().use { it.connect(InetSocketAddress(c.host, c.port!!), 3500); true } } catch (_: Exception) { false }
         return c.copy(reachable = ok, latencyMs = if (ok) (System.nanoTime() - start) / 1_000_000 else null, checkedAt = System.currentTimeMillis())
