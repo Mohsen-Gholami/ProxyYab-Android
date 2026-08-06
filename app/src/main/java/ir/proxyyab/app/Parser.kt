@@ -6,7 +6,7 @@ import org.json.JSONObject
 import java.net.URI
 
 object Parser {
-    private val schemeRegex = Regex("(?i)(?:https?://t\\.me/proxy\\?[^\\s<>\"']+|tg://proxy\\?[^\\s<>\"']+|(?:vmess|vless|trojan|ss)://[^\\s<>\"']+)")
+    private val schemeRegex = Regex("(?i)(?:https?://t\\.me/(?:proxy|socks)\\?[^\\s<>\"']+|tg://(?:proxy|socks)\\?[^\\s<>\"']+|(?:vmess|vless|trojan|ss)://[^\\s<>\"']+)")
 
     fun extract(text: String, source: String): List<Candidate> {
         val expanded = maybeSubscription(text)
@@ -25,12 +25,13 @@ object Parser {
 
     fun parse(raw: String, source: String): Candidate? = try {
         when {
-            raw.startsWith("tg://", true) || raw.startsWith("http://t.me/proxy", true) || raw.startsWith("https://t.me/proxy", true) -> {
+            raw.startsWith("tg://", true) || raw.startsWith("http://t.me/proxy", true) || raw.startsWith("https://t.me/proxy", true) || raw.startsWith("http://t.me/socks", true) || raw.startsWith("https://t.me/socks", true) -> {
                 val u = Uri.parse(raw)
                 val host = u.getQueryParameter("server")
                 val port = u.getQueryParameter("port")?.toIntOrNull()
-                if (host.isNullOrBlank() || port == null || u.getQueryParameter("secret").isNullOrBlank()) null
-                else Candidate(raw, Kind.TELEGRAM, host, port, source)
+                val isMtproto = raw.contains("/proxy?", true) || raw.contains("://proxy?", true)
+                val credentialOk = if (isMtproto) !u.getQueryParameter("secret").isNullOrBlank() else true
+                if (host.isNullOrBlank() || port == null || !credentialOk) null else Candidate(raw, Kind.TELEGRAM, host, port, source)
             }
             raw.startsWith("vmess://", true) -> parseVmess(raw, source)
             else -> {
