@@ -120,7 +120,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun aboutDialog() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22)) }
-        box.addView(TextView(this).apply { text = "پروکسی‌یاب\nنسخه ۱.۱.۱\n\nطراح و توسعه‌دهنده: محسن غلامی\n\nفروشگاه تجهیزات دیجیتال و گجت\ntaminit.com\nطراحی سایت و خدمات فناوری اطلاعات"; textSize = 16f; gravity = Gravity.RIGHT; setTextColor(Color.rgb(22, 54, 48)) })
+        box.setBackgroundColor(Color.rgb(18, 76, 65))
+        box.addView(TextView(this).apply { text = "پروکسی‌یاب\nنسخه ۱.۱.۲\n\nطراح و توسعه‌دهنده: محسن غلامی\n\nفروشگاه تجهیزات دیجیتال و گجت\ntaminit.com\nطراحی سایت و خدمات فناوری اطلاعات"; textSize = 16f; gravity = Gravity.RIGHT; setTextColor(Color.WHITE) })
         box.addView(Button(this).apply { text = "مشاهده فروشگاه تجهیزات دیجیتال و گجت"; setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://taminit.com"))) } })
         box.addView(Button(this).apply { text = "ارسال تیکت پشتیبانی"; setOnClickListener { ticketDialog() } })
         AlertDialog.Builder(this).setTitle("درباره برنامه").setView(box).setPositiveButton("بستن", null).show()
@@ -137,7 +138,7 @@ class MainActivity : AppCompatActivity() {
         dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             if (name.text.isBlank() || subject.text.isBlank() || message.text.isBlank()) { Toast.makeText(this, "همه فیلدها را تکمیل کنید.", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             if (captcha.text.toString() != code) { captcha.error = "کد امنیتی صحیح نیست"; return@setOnClickListener }
-            val body = "نام: ${name.text}\nنسخه برنامه: 1.1.1\n\n${message.text}"
+            val body = "نام: ${name.text}\nنسخه برنامه: 1.1.2\n\n${message.text}"
             val uri = Uri.parse("mailto:gholami.m@gmail.com?subject=${Uri.encode("تیکت پروکسی‌یاب: ${subject.text}")}&body=${Uri.encode(body)}")
             try { startActivity(Intent(Intent.ACTION_SENDTO, uri)); dialog.dismiss() } catch (_: ActivityNotFoundException) { Toast.makeText(this, "برنامه ایمیل روی گوشی پیدا نشد.", Toast.LENGTH_LONG).show() }
         } }
@@ -153,7 +154,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun schedule() {
-        val req = PeriodicWorkRequestBuilder<RefreshWorker>(6, TimeUnit.HOURS).setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build()
+        val req = PeriodicWorkRequestBuilder<RefreshWorker>(1, TimeUnit.HOURS).setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork("refresh", ExistingPeriodicWorkPolicy.UPDATE, req)
     }
 
