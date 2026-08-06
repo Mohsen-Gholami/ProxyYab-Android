@@ -121,7 +121,8 @@ class MainActivity : AppCompatActivity() {
     private fun aboutDialog() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22)) }
         box.setBackgroundColor(Color.rgb(18, 76, 65))
-        box.addView(TextView(this).apply { text = "پروکسی‌یاب\nنسخه ۱.۱.۲\n\nطراح و توسعه‌دهنده: محسن غلامی\n\nفروشگاه تجهیزات دیجیتال و گجت\ntaminit.com\nطراحی سایت و خدمات فناوری اطلاعات"; textSize = 16f; gravity = Gravity.RIGHT; setTextColor(Color.WHITE) })
+        box.addView(TextView(this).apply { text = "پروکسی‌یاب\nنسخه ۱.۱.۳\n\nطراح و توسعه‌دهنده: محسن غلامی\n\nفروشگاه تجهیزات دیجیتال و گجت\ntaminit.com\nطراحی سایت و خدمات فناوری اطلاعات"; textSize = 16f; gravity = Gravity.RIGHT; setTextColor(Color.WHITE) })
+        box.addView(Button(this).apply { text = "برنامه بازکننده پروکسی تلگرام"; setOnClickListener { telegramAppDialog() } })
         box.addView(Button(this).apply { text = "مشاهده فروشگاه تجهیزات دیجیتال و گجت"; setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://taminit.com"))) } })
         box.addView(Button(this).apply { text = "ارسال تیکت پشتیبانی"; setOnClickListener { ticketDialog() } })
         AlertDialog.Builder(this).setTitle("درباره برنامه").setView(box).setPositiveButton("بستن", null).show()
@@ -138,7 +139,7 @@ class MainActivity : AppCompatActivity() {
         dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             if (name.text.isBlank() || subject.text.isBlank() || message.text.isBlank()) { Toast.makeText(this, "همه فیلدها را تکمیل کنید.", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             if (captcha.text.toString() != code) { captcha.error = "کد امنیتی صحیح نیست"; return@setOnClickListener }
-            val body = "نام: ${name.text}\nنسخه برنامه: 1.1.2\n\n${message.text}"
+            val body = "نام: ${name.text}\nنسخه برنامه: 1.1.3\n\n${message.text}"
             val uri = Uri.parse("mailto:gholami.m@gmail.com?subject=${Uri.encode("تیکت پروکسی‌یاب: ${subject.text}")}&body=${Uri.encode(body)}")
             try { startActivity(Intent(Intent.ACTION_SENDTO, uri)); dialog.dismiss() } catch (_: ActivityNotFoundException) { Toast.makeText(this, "برنامه ایمیل روی گوشی پیدا نشد.", Toast.LENGTH_LONG).show() }
         } }
@@ -146,11 +147,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun open(c: Candidate) {
-        try { startActivity(Intent.createChooser(Intent(Intent.ACTION_VIEW, Uri.parse(c.uri)), "باز کردن با…")) }
+        try {
+            val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(c.uri))
+            if (c.kind == Kind.TELEGRAM && !getPreferences(MODE_PRIVATE).getBoolean("ask_telegram_app", false)) {
+                try { startActivity(viewIntent.setPackage("org.telegram.messenger")); return }
+                catch (_: ActivityNotFoundException) { viewIntent.setPackage(null) }
+            }
+            startActivity(Intent.createChooser(viewIntent, "باز کردن با…"))
+        }
         catch (_: ActivityNotFoundException) {
             (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("config", c.uri))
             Toast.makeText(this, "برنامه سازگار پیدا نشد؛ لینک کپی شد.", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun telegramAppDialog() {
+        val prefs = getPreferences(MODE_PRIVATE)
+        val selected = if (prefs.getBoolean("ask_telegram_app", false)) 1 else 0
+        AlertDialog.Builder(this).setTitle("بازکردن پروکسی تلگرام")
+            .setSingleChoiceItems(arrayOf("تلگرام رسمی (پیش‌فرض)", "هر بار سؤال شود"), selected) { dialog, which ->
+                prefs.edit().putBoolean("ask_telegram_app", which == 1).apply()
+                Toast.makeText(this, if (which == 0) "تلگرام رسمی انتخاب شد" else "پنجره انتخاب برنامه نمایش داده می‌شود", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }.setNegativeButton("انصراف", null).show()
     }
 
     private fun schedule() {
