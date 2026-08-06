@@ -1,6 +1,9 @@
 package ir.proxyyab.app
 
-enum class Kind { TELEGRAM, VMESS, VLESS, TROJAN, SHADOWSOCKS, NPVT, UNKNOWN }
+enum class Kind {
+    TELEGRAM, VMESS, VLESS, TROJAN, SHADOWSOCKS,
+    NPVT, OPENVPN, WIREGUARD, SLIPNET, OTHER, UNKNOWN
+}
 
 data class Candidate(
     val uri: String,
