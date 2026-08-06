@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android Release
 
 on:
   push:
@@ -17,6 +17,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Restore launcher and store icons
+        shell: bash
+        run: |
+          mkdir -p app/src/main/res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi} store-assets
+          base64 -d assets-b64/ic_launcher_mdpi.b64 > app/src/main/res/mipmap-mdpi/ic_launcher.png
+          base64 -d assets-b64/ic_launcher_hdpi.b64 > app/src/main/res/mipmap-hdpi/ic_launcher.png
+          base64 -d assets-b64/ic_launcher_xhdpi.b64 > app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          base64 -d assets-b64/ic_launcher_xxhdpi.b64 > app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          base64 -d assets-b64/ic_launcher_xxxhdpi.b64 > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do cp app/src/main/res/mipmap-$density/ic_launcher.png app/src/main/res/mipmap-$density/ic_launcher_round.png; done
+          base64 -d assets-b64/google-play-icon-512.b64 > store-assets/google-play-icon-512.png
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -26,12 +37,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Build debug APK
-        run: gradle --no-daemon clean assembleDebug
-      - name: Upload APK
+      - name: Build unsigned release bundle
+        run: gradle --no-daemon clean assembleDebug bundleRelease
+      - name: Upload release files
         uses: actions/upload-artifact@v4
         with:
-          name: ProxyYab-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ProxyYab-release-unsigned
+          path: |
+            app/build/outputs/bundle/release/app-release.aab
+            app/build/outputs/apk/debug/app-debug.apk
+            store-assets/google-play-icon-512.png
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7

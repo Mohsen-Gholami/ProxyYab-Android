@@ -20,18 +20,34 @@ class Repository(private val context: Context) {
     private val prefs = context.getSharedPreferences("proxy_yab", Context.MODE_PRIVATE)
     private val client = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(12, TimeUnit.SECONDS).followRedirects(true).build()
 
-    fun sources(): List<String> = prefs.getString("sources", "")!!.lines().map { it.trim() }.filter { it.startsWith("http") }
+    fun sources(): List<String> {
+        val custom = prefs.getString("sources", "")!!.lines().map { it.trim() }.filter { it.startsWith("http") }
+        return (DefaultSources.urls + custom).distinct()
+    }
     fun saveSources(value: String) = prefs.edit().putString("sources", value).apply()
 
     suspend fun refresh(): List<Candidate> = withContext(Dispatchers.IO) {
         val all = coroutineScope {
-            sources().map { url -> async { fetch(url)?.let { Parser.extract(it, url) }.orEmpty() } }.awaitAll().flatten()
+            sources().map { original ->
+                async {
+                    val url = normalizeSourceUrl(original)
+                    fetch(url)?.let { Parser.extract(it, original) }.orEmpty()
+                }
+            }.awaitAll().flatten()
         }.distinctBy { it.uri }
-        val gate = Semaphore(32)
-        val checked = coroutineScope { all.take(500).map { async { gate.withPermit { check(it) } } }.awaitAll() }
+        // Probe beyond the first 30 because public lists often start with expired nodes.
+        // File-based families need no socket test, so 30 entries are sufficient there.
+        val limited = all.groupBy { family(it.kind) }.values.flatMap { group ->
+            if (group.firstOrNull()?.host == null) group.take(30) else group.take(90)
+        }
+        val gate = Semaphore(12)
+        val checked = coroutineScope { limited.map { async { gate.withPermit { check(it) } } }.awaitAll() }
             .sortedWith(compareByDescending<Candidate> { it.reachable }.thenBy { it.latencyMs ?: Long.MAX_VALUE })
-        saveCache(checked)
-        checked
+        val healthy = checked.filter { it.reachable }.groupBy { family(it.kind) }.values.flatMap { it.take(30) }
+        if (healthy.isNotEmpty()) {
+            saveCache(healthy)
+            healthy
+        } else cached()
     }
 
     private fun fetch(url: String): String? = try {
@@ -40,10 +56,29 @@ class Repository(private val context: Context) {
         }
     } catch (_: Exception) { null }
 
+    /** Telegram's normal channel URL is only a landing page. /s/ exposes public post previews. */
+    private fun normalizeSourceUrl(input: String): String {
+        val clean = input.trim().removeSuffix("/")
+        val match = Regex("(?i)^https?://(?:www\\.)?t\\.me/([A-Za-z0-9_]{4,})$").matchEntire(clean)
+        return match?.groupValues?.get(1)?.let { "https://t.me/s/$it" } ?: clean
+    }
+
     private fun check(c: Candidate): Candidate {
+        if (c.kind in setOf(Kind.NPVT, Kind.OPENVPN, Kind.WIREGUARD, Kind.SLIPNET, Kind.OTHER))
+            return c.copy(reachable = true, checkedAt = System.currentTimeMillis())
         val start = System.nanoTime()
-        val ok = try { Socket().use { it.connect(InetSocketAddress(c.host, c.port!!), 3500); true } } catch (_: Exception) { false }
+        val ok = try { Socket().use { it.connect(InetSocketAddress(c.host, c.port!!), 2200); true } } catch (_: Exception) { false }
         return c.copy(reachable = ok, latencyMs = if (ok) (System.nanoTime() - start) / 1_000_000 else null, checkedAt = System.currentTimeMillis())
+    }
+
+    private fun family(kind: Kind): String = when (kind) {
+        Kind.TELEGRAM -> "telegram"
+        Kind.VMESS, Kind.VLESS, Kind.TROJAN, Kind.SHADOWSOCKS -> "v2ray"
+        Kind.NPVT -> "npvt"
+        Kind.OPENVPN -> "openvpn"
+        Kind.WIREGUARD -> "wireguard"
+        Kind.SLIPNET -> "slipnet"
+        else -> "other"
     }
 
     private fun saveCache(items: List<Candidate>) {
